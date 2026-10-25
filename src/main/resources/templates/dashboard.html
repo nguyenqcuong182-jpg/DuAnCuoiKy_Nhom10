@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f6f2">
+    <title>Bãi xe | Điều hành</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" th:href="@{/}" aria-label="Bãi xe, về tổng quan">
+            <span class="brand-mark">P</span>
+            <span class="brand-name">PARK<span>OPS</span></span>
+        </a>
+        <div class="topbar-right">
+            <span class="environment-label">QUẢN LÝ BÃI ĐỖ XE</span>
+            <span class="connection-state" th:classappend="${dbAvailable} ? ' is-online' : ' is-offline'">
+                <span class="state-dot"></span>
+                <span th:text="${dbAvailable} ? 'Đã kết nối' : 'Mất kết nối DB'">Trạng thái</span>
+            </span>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-heading">
+            <div>
+                <p class="eyebrow">PARKING MANAGEMENT <span> / </span> OVERVIEW</p>
+                <h1>Điều hành bãi xe</h1>
+                <p class="subtitle">Theo dõi chỗ trống, lượt gửi và doanh thu trong ngày.</p>
+            </div>
+            <div class="heading-meta">
+                <span class="meta-label">HÔM NAY</span>
+                <span class="meta-value" th:text="${currentDate}">16/10/2026</span>
+            </div>
+        </section>
+
+        <div class="notice notice-error" th:if="${!dbAvailable}">
+            <span class="notice-mark">!</span>
+            <div>
+                <strong>Chưa đọc được dữ liệu bãi xe</strong>
+                <p th:text="${databaseMessage}">Hãy kiểm tra kết nối MySQL.</p>
+            </div>
+        </div>
+        <div class="notice" th:if="${toast != null}" th:classappend="${' notice-' + toastKind}">
+            <span class="notice-mark" th:text="${toastKind == 'success'} ? 'OK' : '!'">!</span>
+            <p th:text="${toast}">Kết quả thao tác</p>
+        </div>
+
+        <section class="metrics" aria-label="Tổng quan">
+            <article class="metric metric-primary">
+                <div class="metric-top"><span>Tổng số ô</span><span class="metric-index">01</span></div>
+                <div class="metric-value" th:text="${dashboard.totalSlots}">0</div>
+                <div class="metric-caption">Ô đỗ trong hệ thống</div>
+            </article>
+            <article class="metric metric-available">
+                <div class="metric-top"><span>Đang trống</span><span class="metric-index">02</span></div>
+                <div class="metric-value" th:text="${dashboard.availableSlots}">0</div>
+                <div class="metric-caption">Sẵn sàng tiếp nhận</div>
+            </article>
+            <article class="metric metric-occupied">
+                <div class="metric-top"><span>Xe trong bãi</span><span class="metric-index">03</span></div>
+                <div class="metric-value" th:text="${dashboard.activeVehicles}">0</div>
+                <div class="metric-caption">Lượt gửi đang hoạt động</div>
+            </article>
+            <article class="metric metric-revenue">
+                <div class="metric-top"><span>Doanh thu hôm nay</span><span class="metric-index">04</span></div>
+                <div class="metric-value metric-money" th:text="${dashboard.todayRevenue.toPlainString()}">0</div>
+                <div class="metric-caption">VND · đã thanh toán</div>
+            </article>
+        </section>
+
+        <section class="workbench">
+            <article class="panel actions-panel">
+                <div class="panel-heading">
+                    <div><p class="panel-kicker">THAO TÁC</p><h2>Nhận xe</h2></div>
+                    <span class="panel-number">A</span>
+                </div>
+                <form th:action="@{/check-in}" method="post" class="form-stack">
+                    <label for="licensePlate">Biển số xe</label>
+                    <input id="licensePlate" name="licensePlate" type="text" placeholder="VD: 59A-123.45"
+                           maxlength="20" autocomplete="off" required>
+                    <label for="vehicleType">Loại xe</label>
+                    <select id="vehicleType" name="vehicleType" required>
+                        <option value="MOTORCYCLE">Xe máy</option>
+                        <option value="CAR">Ô tô</option>
+                        <option value="TRUCK">Xe tải</option>
+                    </select>
+                    <button class="button button-dark" type="submit">Xác nhận nhận xe <span aria-hidden="true">→</span></button>
+                </form>
+                <div class="panel-divider"></div>
+                <div class="panel-heading checkout-heading">
+                    <div><p class="panel-kicker">THANH TOÁN</p><h2>Trả xe</h2></div>
+                    <span class="panel-number">B</span>
+                </div>
+                <form th:action="@{/check-out}" method="post" class="form-stack">
+                    <label for="checkoutPlate">Biển số xe</label>
+                    <div class="inline-form">
+                        <input id="checkoutPlate" name="licensePlate" type="text" placeholder="Nhập biển số"
+                               maxlength="20" autocomplete="off" required>
+                        <button class="button button-accent" type="submit">Tính phí</button>
+                    </div>
+                    <p class="form-hint">Phí làm tròn theo giờ, tối thiểu 1 giờ.</p>
+                </form>
+            </article>
+
+            <article class="panel slots-panel">
+                <div class="panel-heading">
+                    <div><p class="panel-kicker">SƠ ĐỒ BÃI</p><h2>Trạng thái ô đỗ</h2></div>
+                    <div class="legend"><span><i class="legend-dot free"></i>Trống</span><span><i class="legend-dot busy"></i>Đang dùng</span></div>
+                </div>
+                <form th:action="@{/slots/add}" method="post" class="slot-add-form">
+                    <label for="newSlotNumber">Thêm ô trống</label>
+                    <input id="newSlotNumber" name="slotNumber" type="text" maxlength="10"
+                           pattern="[A-Za-z0-9-]{1,10}" placeholder="Mã ô, VD: M11" required>
+                    <select name="vehicleType" aria-label="Loại xe cho ô mới" required>
+                        <option value="MOTORCYCLE">Xe máy</option>
+                        <option value="CAR">Ô tô</option>
+                        <option value="TRUCK">Xe tải</option>
+                    </select>
+                    <button class="button button-accent" type="submit">Thêm ô</button>
+                </form>
+                <div class="slot-list" th:if="${!slots.isEmpty()}">
+                    <div class="slot-row" th:each="slot : ${slots}">
+                        <span class="slot-code" th:text="${slot.number}">M01</span>
+                        <span class="slot-type" th:switch="${slot.type}">
+                            <span th:case="'MOTORCYCLE'">Xe máy</span>
+                            <span th:case="'CAR'">Ô tô</span>
+                            <span th:case="'TRUCK'">Xe tải</span>
+                        </span>
+                        <span class="slot-status" th:classappend="${slot.status == 'AVAILABLE'} ? ' status-free' : ' status-busy'">
+                            <i></i><span th:text="${slot.status == 'AVAILABLE'} ? 'Còn trống' : 'Đang sử dụng'">Còn trống</span>
+                        </span>
+                        <div class="slot-actions" th:if="${slot.status == 'AVAILABLE'}">
+                            <details class="slot-edit">
+                                <summary>Sửa</summary>
+                                <form th:action="@{/slots/update}" method="post" class="slot-edit-form">
+                                    <input type="hidden" name="currentSlotNumber" th:value="${slot.number}">
+                                    <label class="visually-hidden" th:for="${'slot-number-' + slot.number}">Mã ô</label>
+                                    <input th:id="${'slot-number-' + slot.number}" name="slotNumber"
+                                           th:value="${slot.number}" maxlength="10" pattern="[A-Za-z0-9-]{1,10}" required>
+                                    <label class="visually-hidden" th:for="${'slot-type-' + slot.number}">Loại xe</label>
+                                    <select th:id="${'slot-type-' + slot.number}" name="vehicleType" required>
+                                        <option value="MOTORCYCLE" th:selected="${slot.type == 'MOTORCYCLE'}">Xe máy</option>
+                                        <option value="CAR" th:selected="${slot.type == 'CAR'}">Ô tô</option>
+                                        <option value="TRUCK" th:selected="${slot.type == 'TRUCK'}">Xe tải</option>
+                                    </select>
+                                    <button class="button button-accent" type="submit">Lưu</button>
+                                </form>
+                            </details>
+                            <form th:action="@{/slots/delete}" method="post"
+                                  onsubmit="return confirm('Xóa ô đỗ này?')">
+                                <input type="hidden" name="slotNumber" th:value="${slot.number}">
+                                <button class="button button-danger" type="submit">Xóa</button>
+                            </form>
+                        </div>
+                        <span class="slot-locked" th:if="${slot.status != 'AVAILABLE'}">Khóa thao tác</span>
+                    </div>
+                </div>
+                <div class="empty-state" th:if="${slots.isEmpty()}">
+                    <strong>Chưa có sơ đồ ô đỗ</strong>
+                    <span>Dữ liệu sẽ xuất hiện khi kết nối được cơ sở dữ liệu.</span>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel rates-panel">
+            <div class="panel-heading">
+                <div><p class="panel-kicker">BIỂU PHÍ</p><h2>Giá gửi xe theo loại</h2></div>
+            </div>
+            <div class="rate-list" th:if="${!vehicleRates.isEmpty()}">
+                <form th:each="rate : ${vehicleRates}" th:action="@{/rates/update}" method="post"
+                      class="rate-card">
+                    <input type="hidden" name="vehicleType" th:value="${rate.type}">
+                    <label th:for="${'rate-' + rate.type}"
+                           th:text="${rate.type == 'MOTORCYCLE' ? 'Xe máy' : (rate.type == 'CAR' ? 'Ô tô' : 'Xe tải')}">Xe máy</label>
+                    <div class="rate-input">
+                        <input th:id="${'rate-' + rate.type}" name="hourlyRate" type="number" min="1"
+                               step="1" maxlength="12" th:value="${rate.hourlyRate.toPlainString()}" required>
+                        <span>VND/giờ</span>
+                    </div>
+                    <button class="button button-accent" type="submit">Lưu giá</button>
+                </form>
+            </div>
+            <div class="empty-state compact-empty" th:if="${vehicleRates.isEmpty()}">
+                <strong>Chưa có biểu giá</strong><span>Kết nối cơ sở dữ liệu để quản lý giá xe.</span>
+            </div>
+        </section>
+
+        <section class="records-grid">
+            <article class="panel table-panel">
+                <div class="panel-heading">
+                    <div><p class="panel-kicker">ĐANG GỬI</p><h2>Xe trong bãi</h2></div>
+                    <span class="count-chip" th:text="${activeParkings.size()} + ' xe'">0 xe</span>
+                </div>
+                <div class="table-scroll" th:if="${!activeParkings.isEmpty()}">
+                    <table>
+                        <thead><tr><th>BIỂN SỐ</th><th>LOẠI XE</th><th>Ô ĐỖ</th><th>GIỜ VÀO</th><th>THAO TÁC</th></tr></thead>
+                        <tbody>
+                        <tr th:each="parking : ${activeParkings}">
+                            <td class="plate-cell" th:text="${parking.plate}">59A-123.45</td>
+                            <td th:switch="${parking.type}">
+                                <span th:case="'MOTORCYCLE'">Xe máy</span><span th:case="'CAR'">Ô tô</span><span th:case="'TRUCK'">Xe tải</span>
+                            </td>
+                            <td><span class="slot-chip" th:text="${parking.slot}">M01</span></td>
+                            <td class="muted-cell" th:text="${#strings.replace(parking.enteredAt.toString(), 'T', ' ')}">16/10/2026 08:30</td>
+                            <td>
+                                <details class="plate-edit">
+                                    <summary>Sửa biển số</summary>
+                                    <form th:action="@{/update-plate}" method="post" class="plate-edit-form">
+                                        <input type="hidden" name="currentPlate" th:value="${parking.plate}">
+                                        <label class="visually-hidden"
+                                               th:for="${'newPlate-' + parking.slot}">Biển số mới</label>
+                                        <input th:id="${'newPlate-' + parking.slot}" name="newPlate" type="text"
+                                               th:value="${parking.plate}" maxlength="20" autocomplete="off" required>
+                                        <button class="button button-accent" type="submit">Lưu</button>
+                                    </form>
+                                </details>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state compact-empty" th:if="${activeParkings.isEmpty()}">
+                    <strong>Chưa có xe đang gửi</strong><span>Danh sách xe đang hoạt động sẽ hiển thị tại đây.</span>
+                </div>
+            </article>
+
+            <article class="panel history-panel">
+                <div class="panel-heading">
+                    <div><p class="panel-kicker">NHẬT KÝ</p><h2>Lượt gửi gần đây</h2></div>
+                    <span class="panel-number">30</span>
+                </div>
+                <div class="history-list" th:if="${!history.isEmpty()}">
+                    <div class="history-row" th:each="entry : ${history}">
+                        <div class="history-main">
+                            <strong class="plate-cell" th:text="${entry.plate}">59A-123.45</strong>
+                            <span th:text="${entry.slot + ' · ' + #strings.replace(entry.enteredAt.toString(), 'T', ' ')}">M01 · 16/10/2026</span>
+                        </div>
+                        <div class="history-result">
+                            <span th:if="${entry.exitedAt == null}" class="history-active">Đang gửi</span>
+                            <span th:if="${entry.fee != null}" th:text="${entry.fee.toPlainString()} + ' đ'">5.000 đ</span>
+                            <span th:if="${entry.fee == null}" class="muted-cell">Chưa tính phí</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state compact-empty" th:if="${history.isEmpty()}">
+                    <strong>Chưa có lịch sử</strong><span>Tối đa 30 lượt gần nhất sẽ được lưu tại đây.</span>
+                </div>
+            </article>
+        </section>
+    </main>
+    <footer class="footer"><span>PARKOPS</span><span>Hệ thống quản lý bãi đỗ xe</span></footer>
+</div>
+</body>
+</html>
